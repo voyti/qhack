@@ -24,6 +24,70 @@
   animation: screen-shift 3s infinite reverse, screen-blink 3s infinite;
 }
 
+.station-scheme {
+  position: absolute;
+  left: 1167px;
+  top: 190px;
+  z-index: 10;
+  height: 0;
+  width: 200px;
+  overflow: hidden;
+}
+
+.station-scheme.loaded {
+  animation: scan-display-downwards 3s steps(10, end) forwards;
+}
+
+.scheme-scaler {
+  transform: scale(2);
+  transform-origin: left;
+}
+
+.station {
+  position: relative;
+  top: 80px;
+  left: 0;
+  width: 10px;
+  transform: scale(8);
+  transform-origin: left;
+}
+
+.solar-array {
+  position: absolute;
+  width: 10px;
+  transition: transform 5s;
+}
+
+.solar-array.folded {
+  transform: scaleY(0.1);
+}
+
+.array-1, .array-2, .array-3, .array-4 {
+  top: 21px;
+  transform-origin: bottom;
+}
+
+.array-5, .array-6, .array-7, .array-8 {
+  top: 111px;
+transform-origin: top;
+}
+
+.array-1, .array-5 {
+  left: 4px;
+}
+
+.array-2, .array-6 {
+    left: 16px;
+}
+
+.array-3, .array-7 {
+    left: 55px;
+}
+
+.array-4, .array-8 {
+    left: 66px;
+}
+
 @keyframes screen-shift {
   0% { background-position-y: 0 }
   18% { background-position-y: 12px; }
@@ -53,4 +117,9 @@
   88% { opacity: 0.4; }
   92% { opacity: 0.9; }
   100% { opacity: 1 }
+}
+
+@keyframes scan-display-downwards {
+  0% { height: 0 }
+  100% { height: 300px }
 }

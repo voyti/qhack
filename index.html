@@ -4,19 +4,48 @@
         <meta charset="UTF-8">
         <title>Qɥack</title>
         <link rel="stylesheet" href="./style.css">
+        <link rel="icon" type="image/png" href="resources/favicon.png"/>
     </head>
-    <body onload="init()">
+    <body>
         <img style="position: absolute;" src="resources/gwgc201819_overlay.png"></img>
         <div class="canvas-container" style="position: absolute; top: 190px; left: 69px;">
           <canvas id="big-display" width="1025" height="768">
           </canvas>
         </div>
 
+        <div class="station-scheme">
+          <div class="scheme-scaler">
+            <img class="station" src="resources/station.svg"></img>
+            <img class="solar-array folded array-1" src="resources/solar_array.svg"></img>
+            <img class="solar-array folded array-2" src="resources/solar_array.svg"></img>
+            <img class="solar-array folded array-3" src="resources/solar_array.svg"></img>
+            <img class="solar-array folded array-4" src="resources/solar_array.svg"></img>
+
+            <img class="solar-array folded array-5" src="resources/solar_array.svg"></img>
+            <img class="solar-array folded array-6" src="resources/solar_array.svg"></img>
+            <img class="solar-array folded array-7" src="resources/solar_array.svg"></img>
+            <img class="solar-array folded array-8" src="resources/solar_array.svg"></img>
+          </div>
+        </div>
+
+
+
         <div class="canvas-container" style="position: absolute; top: 82px; left: 1145px;">
           <canvas id="small-display" width="721" height="484">
           </canvas>
         </div>
 
-        <script src="app/app.js"></script>
+
+        <iframe src="resources/buzz_loop.mp3" allow="autoplay" id="audio" style="display:none"></iframe>
+
+        <audio class="power-on-sound" preload="auto" controls="none" autoplay volume="0.1" style="display: none;">
+          <source src="resources/power_on.mp3" type="audio/mp3">
+        </audio>
+
+        <audio class="buzz-sound" preload="auto" loop controls="none" style="display: none;">
+          <source src="resources/buzz_loop.mp3" type="audio/mp3">
+        </audio>
+
+        <script src="app/app.js" type="module"></script>
     </body>
 </html>

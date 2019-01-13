@@ -23,14 +23,10 @@ module.exports = {
     spyOn: true,
     jasmine: true,
   },
-  extends: 'eslint:recommended',
   parserOptions: {
     sourceType: 'module',
   },
-  plugins: ['local', 'flowtype'],
-  parser: "babel-eslint",
   rules: {
-    'local/no-unused-injected-dependencies': 2,
     'class-methods-use-this': 0,
     'arrow-parens': 0,
     'lines-around-directive': 0,
@@ -175,68 +171,5 @@ module.exports = {
       markers: ['=', '!'],
     }],
     'wrap-regex': 0,
-    "flowtype/boolean-style": [
-      2,
-      "boolean"
-    ],
-    "flowtype/define-flow-type": 2,
-    "flowtype/delimiter-dangle": [
-      2,
-      "always-multiline"
-    ],
-    "flowtype/generic-spacing": [
-      2,
-      "never"
-    ],
-    "flowtype/no-primitive-constructor-types": 2,
-    "flowtype/no-types-missing-file-annotation": 2,
-    "flowtype/no-weak-types": 0,
-    "flowtype/object-type-delimiter": [
-      2,
-      "comma"
-    ],
-    // LINT TYPES
-    "flowtype/require-parameter-type": 0,
-    "flowtype/require-return-type": [
-      0,
-      "always",
-      {
-        "annotateUndefined": "never"
-      }
-    ],
-    "flowtype/require-valid-file-annotation": 2,
-    "flowtype/semi": [
-      2,
-      "always"
-    ],
-    "flowtype/space-after-type-colon": [
-      2,
-      "always",
-      { "allowLineBreak": true }
-    ],
-    "flowtype/space-before-generic-bracket": [
-      2,
-      "never"
-    ],
-    "flowtype/require-exact-type": [
-      1,
-      "never"
-    ],
-    "flowtype/space-before-type-colon": [
-      2,
-      "never"
-    ],
-    "flowtype/union-intersection-spacing": [
-      2,
-      "always"
-    ],
-    "flowtype/use-flow-type": 1,
-    "flowtype/valid-syntax": 1
   },
-
-  "settings": {
-    "flowtype": {
-      "onlyFilesWithFlowAnnotation": false
-    }
-  }
 };

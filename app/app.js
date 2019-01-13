@@ -1,100 +1,130 @@
-const FONT_COLOR = '#C3E591';
+import AudioService from './audio.js';
+import DrawingService from './drawing.js';
 
-const bigCanvas = {
-  WIDTH: 1025,
-  HEIGHT: 768,
-};
+let gameState = 'preinit';
 
-const smallCanvas = {
-  WIDTH: 721,
-  HEIGHT: 484,
-};
+const availableFrequencies = [0.5, 1, 2];
+let frequencySelected = availableFrequencies[0];
+
+const basePower = 1; // in kW
+let maxPower = 80; // in kW
+let powerAvailable = basePower; // in kW
+
+let maxCharge = 120000; // in Coulombs
+let chargeAvailable = 0;
+
+const maxQubits = 80;
+const chargePerQubit = maxCharge / maxQubits;
+let qubitsOperational = 0;
+
+const powerPerSolarArray = 10;
+let solarArraysOnline = 0;
+
+const maxCrackChance = 80;
+const maxCapacitorLevel = 12;
+let capacitorLevel = 0;
+let capacitorChargePerSecond = () => (0.1 * powerAvailable); // per second
+
+function frequencyChange(direction) {
+  const curIndex = availableFrequencies.indexOf(frequencySelected);
+  let change = 0;
+  if (direction === 'down') {
+    change = 1;
+  } else if (direction === 'up') {
+    change = -1;
+  }
+  if (availableFrequencies[curIndex + change]) {
+    return availableFrequencies[curIndex + change];
+  } else {
+    return frequencySelected;
+  }
+}
 
 function init() {
-  console.log('APP START');
-  initDrawing();
-  initializeTerminal();
-}
+  DrawingService.setFrequencyData(frequencySelected, gameState);
 
-function initDrawing() {
-  const bigCanvasEl = document.getElementById('big-display');
-  const smallCanvasEl = document.getElementById('small-display');
-  bigCanvas.element = bigCanvasEl;
-  smallCanvas.element = smallCanvasEl;
+  DrawingService.initDrawing();
+  initializePowerManager();
+  initializePhaseTerminal();
+  // initializePhaseConfig();
 
-  if (bigCanvasEl.getContext) bigCanvas.ctx = bigCanvasEl.getContext('2d');
-  if (smallCanvasEl.getContext) smallCanvas.ctx = smallCanvasEl.getContext('2d');
-}
+  document.body.onkeydown = (e) => {
 
-function initializeTerminal() {
-  bigCanvas.ctx.font = '18px Courier New';
-  bigCanvas.ctx.fillStyle = FONT_COLOR;
+    const inputMap = {
+      13: 'enter',
+      38: 'up',
+      40: 'down',
+    };
 
-  // bigCanvas.ctx.fillText("Hello World", 10, 50);
-  const initLines = [
-    {text: '------ INITIALIZING ------', time: 2000 },
-    {text: 'Requesting station base data...', time: 1000 },
-    {text: 'Base data received with status: 200 OK', time: 100 },
+    if (inputMap[e.keyCode] === 'enter' && gameState === 'postinit') {
+      initializePhaseConfig();
+    } else if (inputMap[e.keyCode] === 'enter' && e.altKey && gameState === 'preinit') {
+      initializePhaseConfig();
+    }
 
-    {text: '', time: 10 },
-    {text: '############', time: 500 },
-    {text: '', time: 10 },
+    if (gameState === 'config') {
+      const input = inputMap[e.keyCode];
+      // DrawingService.applyInput(input);
+      frequencySelected = frequencyChange(input);
+      console.warn('frequencySelected: ', frequencySelected);
+      DrawingService.applyFrequencyData(frequencySelected, gameState);
 
-    {text: 'Base: Lima Low Orbit Defense Station; Status: Lockdown Pending', time: 2000 },
-    {text: 'Base Power Status 1/2: 0/8 Solar Arrays Online', time: 1000 },
-    {text: 'Base Power Status 2/2: Power available: 1 kW, including 1kW from external source', time: 1000 },
-
-    {text: '', time: 10 },
-    {text: '############', time: 500 },
-    {text: '', time: 10 },
-
-    {text: 'Requesting station schematics...', time: 200},
-    {text: 'Schematics received with status: 200 OK', time: 500 },
-
-    {text: 'Parsing Station layout...', time: 300 },
-    {text: 'Loading Station map with nav data...', time: 500 },
-
-    {text: '', time: 10 },
-    {text: '############', time: 500 },
-    {text: '', time: 10 },
-
-    {text: 'CRITICAL 1/2: The Master Password needs to be provided in: 5000ms', time: 1500 },
-    {text: 'CRITICAL 2/2: to prevent lockdown, emergency decompression and data wipe', time: 1500 },
-    {text: '', time: 1000 },
-    {text: 'For details please contact your system administrator', time: 2000 },
-  ];
-
-  // _fillTextGradually(bigCanvas.ctx, initText, 4000, bigCanvas.WIDTH / 2 - 200, bigCanvas.HEIGHT / 2 - 14);
-
-  const LINE_HEIGHT = 30;
-  const displayLineAndQueueNext = (ctx, line, i) => {
-    const textBottomMargin = (line.addMargin || 0);
-    _fillTextGradually(ctx, line.text, line.time, bigCanvas.WIDTH / 2 - 400, (bigCanvas.HEIGHT / 10) - 14 + (i * LINE_HEIGHT));
-
-    if (initLines[i + 1]) {
-      setTimeout(() => ((line, i) => displayLineAndQueueNext(ctx, line, i++))(initLines[i + 1], i + 1), line.time);
+      if (input) e.preventDefault();
     }
   };
-
-  displayLineAndQueueNext(bigCanvas.ctx, initLines[0], 0);
-
-  // _fillTextGradually(bigCanvas.ctx, initText, 4000, bigCanvas.WIDTH / 2 - 200, bigCanvas.HEIGHT / 2 - 14);
-
-  setTimeout(() => bigCanvas.element.classList.add('loaded'), 5000);
-  setTimeout(() => smallCanvas.element.classList.add('loaded'), 3000);
 }
 
-function onTerminalInitialized() {
-
+function getPower() {
+  const directPower = basePower + (solarArraysOnline * powerPerSolarArray);
+  const randomOscilationValue = Math.random() * 0.1 * directPower * (Math.random() > 0.5 ? -1 : 1);
+  return directPower + randomOscilationValue;
 }
 
-function _fillTextGradually(ctx, text, fullTime, txtX, txtY, i) {
-  let _i = i || 0;
-  let curText = text.substring(0, _i + 1);
+function initializePowerManager() {
+  refreshPowerDataLoop();
+}
+
+function refreshPowerDataLoop() {
+  powerAvailable = getPower();
+  chargeAvailable += capacitorChargePerSecond();
+  capacitorLevel = Math.floor(chargeAvailable / maxCharge * maxCapacitorLevel);
+
+  const powerData = {
+    power: powerAvailable,
+    capacitorLevel: capacitorLevel,
+    maxQubits: maxQubits,
+    qubitsOperational: Math.floor(chargeAvailable / chargePerQubit),
+    solarArraysOnline: solarArraysOnline,
+    crackChance: maxCrackChance * (capacitorLevel / maxCapacitorLevel),
+  };
+  console.debug(powerData, gameState);
+
+  DrawingService.applyPowerData(powerData, gameState);
 
   setTimeout(() => {
-    ctx.fillText(curText, txtX, txtY);
-    _i++;
-    if (_i < text.length) _fillTextGradually(ctx, text, fullTime, txtX, txtY, _i);
-  }, fullTime / text.length);
+    refreshPowerDataLoop();
+  }, 1000);
 }
+
+function setGameState(newState) {
+  console.log('  -- SETTING GAME STATE: ', newState, '---');
+  gameState = newState;
+}
+
+function initializePhaseTerminal() {
+  gameState = 'preinit';
+  const doneCallback = () => setGameState('postinit');
+
+  DrawingService.drawInitConnection(doneCallback);
+  setTimeout(() => DrawingService.setBigScreenStateLoaded(), 5000);
+  setTimeout(() => DrawingService.setSmallScreenStateLoaded(), 3000);
+}
+
+function initializePhaseConfig() {
+  const doneCallback = () => (setGameState('config'));
+
+  DrawingService.clearScreens();
+  DrawingService.drawConfig(doneCallback);
+}
+
+init();

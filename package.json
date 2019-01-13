@@ -1,0 +1,32 @@
+{
+  "name": "qhack",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app/app.js",
+  "dependencies": {},
+  "devDependencies": {
+    "eslint": "^5.12.0",
+    "eslint-plugin-local": "^1.0.0"
+  },
+  "scripts": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/voyti/qhack.git"
+  },
+  "keywords": [
+    "space",
+    "station",
+    "hacking",
+    "simulator",
+    "quantum",
+    "computer"
+  ],
+  "author": "voyti",
+  "license": "NPOSL-3.0",
+  "bugs": {
+    "url": "https://github.com/voyti/qhack/issues"
+  },
+  "homepage": "https://github.com/voyti/qhack#readme"
+}
