@@ -22,8 +22,15 @@ let solarArraysOnline = 0;
 
 const maxCrackChance = 80;
 const maxCapacitorLevel = 12;
+const minOperationalCapacitorLevel = 5;
 let capacitorLevel = 0;
 let capacitorChargePerSecond = () => (0.1 * powerAvailable); // per second
+
+const maxTimeToLockdown = 300000;
+let timeElapsed = 0;
+const loopRefreshRateMillis = 1000;
+
+let discoverableSignatures = [];
 
 function frequencyChange(direction) {
   const curIndex = availableFrequencies.indexOf(frequencySelected);
@@ -45,8 +52,9 @@ function init() {
 
   DrawingService.initDrawing();
   initializePowerManager();
-  initializePhaseTerminal();
-  // initializePhaseConfig();
+  // initializePhaseTerminal();
+  initializePhaseConfig();
+  // initializePhaseDiscovery();
 
   document.body.onkeydown = (e) => {
 
@@ -56,17 +64,18 @@ function init() {
       40: 'down',
     };
 
-    if (inputMap[e.keyCode] === 'enter' && gameState === 'postinit') {
-      initializePhaseConfig();
-    } else if (inputMap[e.keyCode] === 'enter' && e.altKey && gameState === 'preinit') {
-      initializePhaseConfig();
+    if (inputMap[e.keyCode] === 'enter') {
+      if (gameState === 'postinit') {
+        initializePhaseConfig();
+      } else if (gameState === 'config') {
+        initializePhaseDiscovery();
+      }
     }
 
     if (gameState === 'config') {
       const input = inputMap[e.keyCode];
       // DrawingService.applyInput(input);
       frequencySelected = frequencyChange(input);
-      console.warn('frequencySelected: ', frequencySelected);
       DrawingService.applyFrequencyData(frequencySelected, gameState);
 
       if (input) e.preventDefault();
@@ -81,34 +90,48 @@ function getPower() {
 }
 
 function initializePowerManager() {
-  refreshPowerDataLoop();
+  refreshGameDataLoop();
 }
 
-function refreshPowerDataLoop() {
+function getGameDataForDrawing() {
   powerAvailable = getPower();
   chargeAvailable += capacitorChargePerSecond();
   capacitorLevel = Math.floor(chargeAvailable / maxCharge * maxCapacitorLevel);
 
-  const powerData = {
+  return {
     power: powerAvailable,
+    maxCapacitorLevel: maxCapacitorLevel,
+    minOperationalCapacitorLevel: minOperationalCapacitorLevel,
     capacitorLevel: capacitorLevel,
     maxQubits: maxQubits,
     qubitsOperational: Math.floor(chargeAvailable / chargePerQubit),
     solarArraysOnline: solarArraysOnline,
     crackChance: maxCrackChance * (capacitorLevel / maxCapacitorLevel),
+    discoverableSignatures: discoverableSignatures,
   };
-  console.debug(powerData, gameState);
-
-  DrawingService.applyPowerData(powerData, gameState);
-
-  setTimeout(() => {
-    refreshPowerDataLoop();
-  }, 1000);
 }
 
+function refreshGameDataLoop(loopCount) {
+  const _loopCount = loopCount || 0;
+  timeElapsed = gameState === 'discovery' ? loopRefreshRateMillis * loopCount : 0;
+
+  const gameData = getGameDataForDrawing();
+  gameData.timeToLockDown = maxTimeToLockdown - timeElapsed;
+
+  DrawingService.applyGameData(gameData, gameState);
+
+  setTimeout(() => {
+    ((prevLoopCount) => refreshGameDataLoop(prevLoopCount + 1))(_loopCount);
+  }, loopRefreshRateMillis);
+}
+
+
 function setGameState(newState) {
-  console.log('  -- SETTING GAME STATE: ', newState, '---');
   gameState = newState;
+}
+
+function generateDiscoverablesignatures() {
+  return Math.random().toString(36).slice(2, 5).toUpperCase().split('');
 }
 
 function initializePhaseTerminal() {
@@ -125,6 +148,17 @@ function initializePhaseConfig() {
 
   DrawingService.clearScreens();
   DrawingService.drawConfig(doneCallback);
+}
+
+function initializePhaseDiscovery() {
+  const doneCallback = () => (setGameState('discovery'));
+  discoverableSignatures = generateDiscoverablesignatures();
+  const gameData = getGameDataForDrawing();
+  DrawingService.applyGameData(gameData, gameState);
+
+
+  DrawingService.clearScreens();
+  DrawingService.drawDiscovery(doneCallback, 'discovery');
 }
 
 init();

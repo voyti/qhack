@@ -1,0 +1,182 @@
+import AudioService from './audio.js';
+
+const NODE_SIDE = 60;
+const NODE_MARGIN = 1;
+const NODE_SHIFT = NODE_SIDE + NODE_MARGIN;
+
+const COLOR_OUT_OF_RANGE = '#011E29';
+const COLOR_LOCKED = '#658D9D';
+const COLOR_DISCOVERED_REGULAR = '#D1D3D0';
+const COLOR_DISCOVERED_VULNERABLE = '#9ED5F1';
+
+const PARTY_COLOR = '#C3E591';
+const NODE_SIGNATURE_COLOR = '#FFFFFF';
+const DISCOVERABILITY_RANGE = 2;
+const MAX_VULNERABLE_NODES = 8;
+const SECOND = 1000;
+
+let gridFrequency;
+let discoverableSignatures;
+
+const chanceForDiscoverableSignature = 0.1;
+
+const partyPosition = { col: 6, row: 5 };
+
+let discoveredNodes = [];
+let vulnerableNodes = [];
+
+const isNodeOutOfRange = (node) => {
+  const discoveredInRange =
+    discoveredNodes.filter((discNode) => Math.abs(discNode.col - node.col) <= DISCOVERABILITY_RANGE
+    && Math.abs(discNode.row - node.row) <= DISCOVERABILITY_RANGE);
+  return !discoveredInRange.length;
+};
+
+const isNodeDiscovered = (node) => {
+  return discoveredNodes.filter((discNode) => discNode.row === node.row && discNode.col === node.col).length;
+};
+
+const isDiscoveredRowVulnerable = (node) => {
+  return vulnerableNodes.filter((vulNode) => vulNode.row === node.row && vulNode.col === node.col).length;
+};
+
+const getNodeColor = (node) => {
+  if (isNodeDiscovered(node)) {
+    if (isDiscoveredRowVulnerable(node)) {
+      return COLOR_DISCOVERED_VULNERABLE;
+    } else {
+      return COLOR_DISCOVERED_REGULAR;
+    }
+  } else if (isNodeOutOfRange(node)) {
+    return COLOR_OUT_OF_RANGE;
+  } else {
+    return COLOR_LOCKED;
+  }
+};
+const getRandomSignature = () => Math.random().toString(36).toUpperCase()[2];
+const getRandomFromArray = (array) => array[Math.floor(Math.random() * array.length)];
+
+const getNodeSignature = (node, i) => {
+  if (!node.lastSignatureTimestamp || (Date.now() - node.lastSignatureTimestamp) > SECOND * gridFrequency) {
+
+    if (!isNodeDiscovered(node) && !isNodeOutOfRange(node)) {
+      const signature = Math.random() <= chanceForDiscoverableSignature ?
+        getRandomFromArray(discoverableSignatures) :
+        getRandomSignature();
+
+      node.lastSignature = signature;
+      node.lastSignatureTimestamp = Date.now();
+      return signature;
+    } else {
+      return '';
+    }
+  } else {
+    return node.lastSignature;
+  }
+};
+
+
+const decorateNode = (node) =>
+  Object.assign(node, { color: (node) => getNodeColor(node), signature: (node) => getNodeSignature(node) });
+
+const NODE_MAP = [
+  { col: 0, row: 3 },
+
+  { col: 1, row: 0 },
+  { col: 1, row: 1 },
+  { col: 1, row: 2 },
+  { col: 1, row: 3 },
+  { col: 1, row: 4 },
+  { col: 1, row: 5 },
+  { col: 1, row: 6 },
+
+  { col: 2, row: 3 },
+
+  { col: 3, row: 0 },
+  { col: 3, row: 1 },
+  { col: 3, row: 2 },
+  { col: 3, row: 3 },
+  { col: 3, row: 4 },
+  { col: 3, row: 5 },
+  { col: 3, row: 6 },
+
+  { col: 4, row: 3 },
+  { col: 5, row: 3 },
+
+  { col: 6, row: 2 },
+  { col: 6, row: 3 },
+  { col: 6, row: 4 },
+  { col: 6, row: 5, meta: 'starting' },
+
+  { col: 7, row: 3 },
+  { col: 8, row: 3 },
+
+  { col: 9, row: 0 },
+  { col: 9, row: 1 },
+  { col: 9, row: 2 },
+  { col: 9, row: 3 },
+  { col: 9, row: 4 },
+  { col: 9, row: 5 },
+  { col: 9, row: 6 },
+
+  { col: 10, row: 3 },
+
+  { col: 11, row: 0 },
+  { col: 11, row: 1 },
+  { col: 11, row: 2 },
+  { col: 11, row: 3 },
+  { col: 11, row: 4 },
+  { col: 11, row: 5 },
+  { col: 11, row: 6 },
+
+  { col: 12, row: 3 },
+].map(decorateNode);
+
+
+const BOARD_TOP = 200;
+const BOARD_LEFT = 100;
+
+function getVulnerableNodes() {
+  const vulNodeIdxes = Array.from(Array(MAX_VULNERABLE_NODES));
+
+  for (let i = 0; i < MAX_VULNERABLE_NODES; i++) {
+    let randomIndex;
+    do {
+      randomIndex = Math.floor(Math.random() * NODE_MAP.length);
+      vulNodeIdxes[i] = randomIndex;
+    } while (vulNodeIdxes.slice(0, i).filter((existingIdx) => existingIdx === randomIndex).length); // eslint-disable-line no-loop-func
+  }
+  return vulNodeIdxes.map((index) => NODE_MAP[index]);
+}
+
+function drawCharOnNode(ctx, char, col, row, color) {
+  const x = (col * NODE_SHIFT) + BOARD_LEFT + (NODE_SIDE / 3);
+  const y = (row * NODE_SHIFT) + BOARD_TOP + (NODE_SIDE / 1.5);
+
+  ctx.fillStyle = color;
+  ctx.strokeStyle = '#000000';
+  ctx.font = '36px Courier New';
+  ctx.strokeText(char, x, y);
+  ctx.lineWidth = 2;
+  ctx.fillText(char, x, y);
+}
+
+export default {
+  initBoard: (frequencySelected, initialDiscoverableSignatures) => {
+    vulnerableNodes = getVulnerableNodes();
+    discoveredNodes = NODE_MAP.filter((node) => node.meta === 'starting');
+    gridFrequency = frequencySelected;
+    discoverableSignatures = initialDiscoverableSignatures;
+  },
+
+  refreshBoard(ctx) {
+
+    NODE_MAP.forEach((node, i) => {
+      ctx.fillStyle = node.color(node, i);
+      ctx.fillRect((node.col * NODE_SHIFT) + BOARD_LEFT, (node.row * NODE_SHIFT) + BOARD_TOP, NODE_SIDE, NODE_SIDE);
+      drawCharOnNode(ctx, node.signature(node), node.col, node.row, NODE_SIGNATURE_COLOR);
+    });
+
+    drawCharOnNode(ctx, 'X', partyPosition.col, partyPosition.row, PARTY_COLOR);
+  },
+};
