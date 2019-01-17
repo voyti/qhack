@@ -17,32 +17,38 @@ const SECOND = 1000;
 
 let gridFrequency;
 let discoverableSignatures;
+let onSolarArrayUnfold = () => {};
+const partyMoveSpeed = 1000;
+let lastPartyMoveTimestamp = Date.now();
 
 const chanceForDiscoverableSignature = 0.1;
 
+let partyQueuedDestinations = [];
+let currentPartyDestination = {};
 const partyPosition = { col: 6, row: 5 };
 
 let discoveredNodes = [];
 let vulnerableNodes = [];
+let isBoardLocked = false;
 
 const isNodeOutOfRange = (node) => {
-  const discoveredInRange =
+  const nodesInRange =
     discoveredNodes.filter((discNode) => Math.abs(discNode.col - node.col) <= DISCOVERABILITY_RANGE
     && Math.abs(discNode.row - node.row) <= DISCOVERABILITY_RANGE);
-  return !discoveredInRange.length;
+  return node.meta !== 'startingDiscoverable' && !nodesInRange.length;
 };
 
 const isNodeDiscovered = (node) => {
   return discoveredNodes.filter((discNode) => discNode.row === node.row && discNode.col === node.col).length;
 };
 
-const isDiscoveredRowVulnerable = (node) => {
+const isDiscoveredNodeVulnerable = (node) => {
   return vulnerableNodes.filter((vulNode) => vulNode.row === node.row && vulNode.col === node.col).length;
 };
 
 const getNodeColor = (node) => {
   if (isNodeDiscovered(node)) {
-    if (isDiscoveredRowVulnerable(node)) {
+    if (isDiscoveredNodeVulnerable(node)) {
       return COLOR_DISCOVERED_VULNERABLE;
     } else {
       return COLOR_DISCOVERED_REGULAR;
@@ -57,7 +63,9 @@ const getRandomSignature = () => Math.random().toString(36).toUpperCase()[2];
 const getRandomFromArray = (array) => array[Math.floor(Math.random() * array.length)];
 
 const getNodeSignature = (node, i) => {
-  if (!node.lastSignatureTimestamp || (Date.now() - node.lastSignatureTimestamp) > SECOND * gridFrequency) {
+  if (isBoardLocked) {
+    return '';
+  } else if (!isBoardLocked && !node.lastSignatureTimestamp || (Date.now() - node.lastSignatureTimestamp) > SECOND * 1 / gridFrequency) {
 
     if (!isNodeDiscovered(node) && !isNodeOutOfRange(node)) {
       const signature = Math.random() <= chanceForDiscoverableSignature ?
@@ -74,7 +82,6 @@ const getNodeSignature = (node, i) => {
     return node.lastSignature;
   }
 };
-
 
 const decorateNode = (node) =>
   Object.assign(node, { color: (node) => getNodeColor(node), signature: (node) => getNodeSignature(node) });
@@ -104,8 +111,8 @@ const NODE_MAP = [
   { col: 5, row: 3 },
 
   { col: 6, row: 2 },
-  { col: 6, row: 3 },
-  { col: 6, row: 4 },
+  { col: 6, row: 3, meta: 'startingDiscoverable' },
+  { col: 6, row: 4, meta: 'startingDiscoverable' },
   { col: 6, row: 5, meta: 'starting' },
 
   { col: 7, row: 3 },
@@ -138,6 +145,7 @@ const BOARD_LEFT = 100;
 
 function getVulnerableNodes() {
   const vulNodeIdxes = Array.from(Array(MAX_VULNERABLE_NODES));
+  const possibleVulnerableNodes = NODE_MAP.filter((node) => node.meta === 'starting');
 
   for (let i = 0; i < MAX_VULNERABLE_NODES; i++) {
     let randomIndex;
@@ -161,6 +169,50 @@ function drawCharOnNode(ctx, char, col, row, color) {
   ctx.fillText(char, x, y);
 }
 
+function findConnectedNodes(dest) {
+  return NODE_MAP.filter((node) =>
+    (Math.abs(node.col - dest.col) === 1 && node.row === dest.row) ||
+    (Math.abs(node.row - dest.row) === 1 && node.col === dest.col));
+}
+
+function findNodeByPos(position) {
+  return NODE_MAP.filter((node) =>
+    position.col === node.col &&
+    position.row === node.row)[0];
+}
+
+function findPartyPath(destNode) {
+  const startNode = findNodeByPos(partyPosition);
+  const routeMap = nodeConnectionLookup(startNode, NODE_MAP, destNode);
+  return routeMap;
+}
+
+function nodeConnectionLookup(node, allNodes, destNode, path = [], paths = []) {
+  const validPaths = paths.filter((v) => v);
+
+  if (validPaths.length) {
+    return validPaths[0];
+  } else {
+    const untraversedConnectedNodes = findConnectedNodes(node).filter((node) => !path.includes(node));
+    if (node.col === destNode.col && node.row === destNode.row) {
+      paths.push([...path, node]);
+      return paths[0];
+    } else if (untraversedConnectedNodes.length === 1 && untraversedConnectedNodes[0] === path[path.length - 1]) { // dead end
+      return false;
+    } else { // exit early if a route is found
+      for (let i = 0; i < untraversedConnectedNodes.length; i++) {
+        const result = nodeConnectionLookup(untraversedConnectedNodes[i], allNodes, destNode, [...path, node], paths);
+        if (result) paths.push(result);
+      }
+      return paths[0];
+    }
+  }
+}
+
+function isSamePosition(posA, posB) {
+  return posA.row === posB.row && posA.col === posB.col;
+}
+
 export default {
   initBoard: (frequencySelected, initialDiscoverableSignatures) => {
     vulnerableNodes = getVulnerableNodes();
@@ -170,13 +222,79 @@ export default {
   },
 
   refreshBoard(ctx) {
-
     NODE_MAP.forEach((node, i) => {
       ctx.fillStyle = node.color(node, i);
       ctx.fillRect((node.col * NODE_SHIFT) + BOARD_LEFT, (node.row * NODE_SHIFT) + BOARD_TOP, NODE_SIDE, NODE_SIDE);
       drawCharOnNode(ctx, node.signature(node), node.col, node.row, NODE_SIGNATURE_COLOR);
     });
 
+    if (partyQueuedDestinations.length && !Object.keys(currentPartyDestination).length) {
+      console.warn('UPDATED CURRENT DESTINATION:', partyQueuedDestinations[0]);
+
+      currentPartyDestination = partyQueuedDestinations.shift();
+    }
+
+    if (Object.keys(currentPartyDestination).length &&
+       !isSamePosition(currentPartyDestination, partyPosition)
+      && Date.now() - lastPartyMoveTimestamp > partyMoveSpeed) {
+
+      const possiblePath = findPartyPath(currentPartyDestination).filter((node) => !isSamePosition(node, partyPosition));
+      const newWaypoint = possiblePath[0];
+      lastPartyMoveTimestamp = Date.now();
+      partyPosition.col = newWaypoint.col;
+      partyPosition.row = newWaypoint.row;
+
+    } else if (isSamePosition(currentPartyDestination, partyPosition)) {
+      onSolarArrayUnfold();
+      currentPartyDestination = {};
+    }
+
     drawCharOnNode(ctx, 'X', partyPosition.col, partyPosition.row, PARTY_COLOR);
+  },
+
+  applyInput: (key, resultCallback) => {
+    const upperKey = key.toUpperCase();
+    let newlyDiscoveredNodes = [];
+    let wrongInput = false;
+
+    if (discoverableSignatures.includes(upperKey)) {
+      newlyDiscoveredNodes = NODE_MAP.filter((node) => node.signature(node) === upperKey);
+
+      if (newlyDiscoveredNodes.length) {
+        AudioService.playPop();
+        const vulnerableNodes = newlyDiscoveredNodes.filter((node) => isDiscoveredNodeVulnerable(node));
+        if (vulnerableNodes.length) {
+          const sound = Math.random() > 0.5 ? 'playProceeding1Sound' : 'playProceeding2Sound';
+          AudioService[sound]();
+        }
+
+        partyQueuedDestinations = [
+          ...partyQueuedDestinations,
+          ...vulnerableNodes,
+        ];
+
+      } else {
+        wrongInput = true;
+        AudioService.playThud();
+      }
+    } else {
+      wrongInput = true;
+      AudioService.playThud();
+    }
+
+    discoveredNodes = [...discoveredNodes, ...newlyDiscoveredNodes];
+    resultCallback(wrongInput);
+  },
+
+  applyDiscoverableSignatures: (newDiscoverableSignatures) => {
+    discoverableSignatures = newDiscoverableSignatures;
+  },
+
+  registerOnSolarArrayUnfoldCallback: (onSolarArrayUnfoldCb) => {
+    onSolarArrayUnfold = onSolarArrayUnfoldCb;
+  },
+
+  lockSignatures: (lock) => {
+    isBoardLocked = lock;
   },
 };

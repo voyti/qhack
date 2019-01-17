@@ -1,36 +1,50 @@
 import AudioService from './audio.js';
 import DrawingService from './drawing.js';
+import BoardService from './board.js';
 
 let gameState = 'preinit';
 
 const availableFrequencies = [0.5, 1, 2];
-let frequencySelected = availableFrequencies[0];
-
-const basePower = 1; // in kW
-let maxPower = 80; // in kW
-let powerAvailable = basePower; // in kW
-
-let maxCharge = 120000; // in Coulombs
-let chargeAvailable = 0;
-
-const maxQubits = 80;
-const chargePerQubit = maxCharge / maxQubits;
-let qubitsOperational = 0;
-
-const powerPerSolarArray = 10;
-let solarArraysOnline = 0;
-
+// const basePower = 1; // in kW
+const basePower = 100; // in kW
 const maxCrackChance = 80;
 const maxCapacitorLevel = 12;
 const minOperationalCapacitorLevel = 5;
-let capacitorLevel = 0;
-let capacitorChargePerSecond = () => (0.1 * powerAvailable); // per second
-
+const maxCharge = 120000; // in Coulombs
+const maxQubits = 80;
+const chargePerQubit = maxCharge / maxQubits;
+const powerPerSolarArray = 10;
 const maxTimeToLockdown = 300000;
-let timeElapsed = 0;
+const penaltyPeriod = 1000;
 const loopRefreshRateMillis = 1000;
 
-let discoverableSignatures = [];
+let qubitsOperational;
+let chargeAvailable;
+let solarArraysOnline;
+let powerAvailable;
+let frequencySelected;
+let capacitorLevel;
+let capacitorChargePerSecond;
+let accruedPenalty;
+let timeElapsed;
+let discoverableSignatures;
+let crackChance;
+let timePaused = false;
+
+function resetGameStateValues() {
+  qubitsOperational = 0;
+  chargeAvailable = 0;
+  solarArraysOnline = 0;
+  powerAvailable = basePower; // in kW
+  frequencySelected = availableFrequencies[0];
+  capacitorLevel = 0;
+  capacitorChargePerSecond = () => (10 * powerAvailable); // per second
+  accruedPenalty = 0;
+  timeElapsed = 0;
+  discoverableSignatures = [];
+  crackChance = 0;
+}
+
 
 function frequencyChange(direction) {
   const curIndex = availableFrequencies.indexOf(frequencySelected);
@@ -47,14 +61,29 @@ function frequencyChange(direction) {
   }
 }
 
-function init() {
+const getSignatureRecalibrationPeriod = () => 2000 * 1 / frequencySelected;
+
+// TODO: all values unique, all values different than previous
+function generateDiscoverablesignatures() {
+  return Math.random().toString(36).slice(2, 5).toUpperCase().split('');
+}
+
+let boardLocked = false;
+
+function init(startAtConfig) {
+  resetGameStateValues();
   DrawingService.setFrequencyData(frequencySelected, gameState);
 
   DrawingService.initDrawing();
+  DrawingService.clearScreens();
+
   initializePowerManager();
   // initializePhaseTerminal();
   initializePhaseConfig();
+  if (startAtConfig) initializePhaseConfig();
   // initializePhaseDiscovery();
+
+  const alphabeticalMatcher = (char) => char.match(/[A-Za-z0-9]/);
 
   document.body.onkeydown = (e) => {
 
@@ -69,18 +98,48 @@ function init() {
         initializePhaseConfig();
       } else if (gameState === 'config') {
         initializePhaseDiscovery();
+      } else if (gameState === 'lose') {
+        init(true);
+      } else if (gameState === 'discovery') {
+        attemptCracking();
       }
     }
 
     if (gameState === 'config') {
       const input = inputMap[e.keyCode];
-      // DrawingService.applyInput(input);
       frequencySelected = frequencyChange(input);
       DrawingService.applyFrequencyData(frequencySelected, gameState);
 
       if (input) e.preventDefault();
     }
+
+    if (gameState === 'discovery') {
+      if (alphabeticalMatcher(e.key) && !boardLocked) {
+        BoardService.applyInput(e.key, (wrongInput) => {
+          if (wrongInput) accruedPenalty += penaltyPeriod;
+          setBoardLocked(true);
+
+          setTimeout(() => {
+            setBoardLocked(false);
+
+            discoverableSignatures = generateDiscoverablesignatures();
+            BoardService.applyDiscoverableSignatures(discoverableSignatures);
+            const gameData = getGameDataForDrawing();
+            DrawingService.applyGameData(gameData, gameState);
+          }, getSignatureRecalibrationPeriod());
+
+          const gameData = getGameDataForDrawing();
+          DrawingService.applyGameData(gameData, gameState);
+        });
+      }
+    }
   };
+}
+
+function setBoardLocked(locked) {
+  boardLocked = locked;
+  BoardService.lockSignatures(locked);
+  DrawingService.lockSignatures(locked);
 }
 
 function getPower() {
@@ -96,7 +155,9 @@ function initializePowerManager() {
 function getGameDataForDrawing() {
   powerAvailable = getPower();
   chargeAvailable += capacitorChargePerSecond();
+  if (chargeAvailable > maxCharge) chargeAvailable -= chargeAvailable - maxCharge;
   capacitorLevel = Math.floor(chargeAvailable / maxCharge * maxCapacitorLevel);
+  crackChance = maxCrackChance * (capacitorLevel / maxCapacitorLevel);
 
   return {
     power: powerAvailable,
@@ -113,11 +174,12 @@ function getGameDataForDrawing() {
 
 function refreshGameDataLoop(loopCount) {
   const _loopCount = loopCount || 0;
-  timeElapsed = gameState === 'discovery' ? loopRefreshRateMillis * loopCount : 0;
+  timeElapsed = gameState === 'discovery' ? loopRefreshRateMillis * loopCount + accruedPenalty : 0;
+  if (timeElapsed > maxTimeToLockdown * 0.5) AudioService.playSecondSound();
+  if (timeElapsed >= maxTimeToLockdown) initializePhaseLose();
 
   const gameData = getGameDataForDrawing();
   gameData.timeToLockDown = maxTimeToLockdown - timeElapsed;
-
   DrawingService.applyGameData(gameData, gameState);
 
   setTimeout(() => {
@@ -125,18 +187,29 @@ function refreshGameDataLoop(loopCount) {
   }, loopRefreshRateMillis);
 }
 
-
 function setGameState(newState) {
   gameState = newState;
 }
 
-function generateDiscoverablesignatures() {
-  return Math.random().toString(36).slice(2, 5).toUpperCase().split('');
+function attemptCracking() {
+  if (capacitorLevel >= minOperationalCapacitorLevel) {
+    timePaused = true;
+    setGameState('cracking');
+    const crackingSucceded = crackChance / 10 > Math.random();
+    DrawingService.clearScreens();
+    const gameData = getGameDataForDrawing();
+    DrawingService.applyGameData(gameData, gameState);
+    // DrawingService.drawCracking(crackingSucceded, () => init(true), gameState);
+    DrawingService.drawCracking(crackingSucceded, () => {}, gameState);
+  }
 }
 
 function initializePhaseTerminal() {
   gameState = 'preinit';
-  const doneCallback = () => setGameState('postinit');
+  const doneCallback = (line) => {
+    setGameState('postinit');
+    // line.callback = () => {};
+  };
 
   DrawingService.drawInitConnection(doneCallback);
   setTimeout(() => DrawingService.setBigScreenStateLoaded(), 5000);
@@ -151,14 +224,32 @@ function initializePhaseConfig() {
 }
 
 function initializePhaseDiscovery() {
-  const doneCallback = () => (setGameState('discovery'));
+  const doneCallback = (line) => {
+    setGameState('discovery');
+    // line.callback = () => {};
+  };
   discoverableSignatures = generateDiscoverablesignatures();
   const gameData = getGameDataForDrawing();
   DrawingService.applyGameData(gameData, gameState);
+  BoardService.registerOnSolarArrayUnfoldCallback(() => {
+    solarArraysOnline++;
+    DrawingService.unfoldNextSolarArray();
+  });
 
 
   DrawingService.clearScreens();
   DrawingService.drawDiscovery(doneCallback, 'discovery');
+}
+
+function initializePhaseLose() {
+  setGameState('prelose');
+
+  const doneCallback = (line) => {
+    setGameState('lose');
+    // line.callback = () => {};
+  };
+  DrawingService.clearScreens();
+  DrawingService.drawLose();
 }
 
 init();

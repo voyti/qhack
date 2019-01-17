@@ -143,14 +143,26 @@ const BASS = [
 
 let audioContext = new AudioContext();
 let buzzSound = null;
+let thudSound = null;
+let popSound = null;
+let arrayUnfoldSound = null;
+let secondSound = null;
+let proceeding1Sound = null;
+let proceeding2Sound = null;
 
 function init() {
+  const powerOn = document.querySelector('.power-on-sound');
+  powerOn.volume = 0.3;
 
   buzzSound = document.querySelector('.buzz-sound');
   buzzSound.volume = 0.9;
 
-  const powerOn = document.querySelector('.power-on-sound');
-  powerOn.volume = 0.3;
+  thudSound = document.querySelector('.thud-sound');
+  popSound = document.querySelector('.pop-sound');
+  arrayUnfoldSound = document.querySelector('.array-unfold-sound');
+  secondSound = document.querySelector('.second-sound');
+  proceeding1Sound = document.querySelector('.proceeding-1-sound');
+  proceeding2Sound = document.querySelector('.proceeding-2-sound');
 }
 
 function playFrequency(frequency, duration) {
@@ -184,6 +196,14 @@ function playSequence(tones, i) {
 export default {
   playBuzz: () => buzzSound && buzzSound.play(),
   pauseBuzz: () => buzzSound && buzzSound.pause(),
+  playThud: () => thudSound && thudSound.play(),
+  playPop: () => popSound && popSound.play(),
+  playArrayUnfoldSound: () => arrayUnfoldSound && arrayUnfoldSound.play(),
+  playSecondSound: () => secondSound && secondSound.play(),
+
+  playProceeding1Sound: () => proceeding1Sound && proceeding1Sound.play(),
+  playProceeding2Sound: () => proceeding2Sound && proceeding2Sound.play(),
+
   playMelody: () => {
     playSequence([...MELODY, ...MELODY, ...MELODY, ...MELODY], 0);
     playSequence([...BASS, ...BASS, ...BASS, ...BASS], 0);

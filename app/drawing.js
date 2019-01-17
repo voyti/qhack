@@ -18,8 +18,10 @@ let crackChance;
 let lastTimeToLockDown;
 let lastTimeToLockDownUpdate; // timestamp of update
 let discoverableSignatures;
+let crackingStartedAt;
 
 let smallDisplayLocked = false;
+let siganturesLocked = false;
 
 let bigCanvas = {
   WIDTH: 1025,
@@ -38,12 +40,10 @@ const getCapacitorMarkAtLevel = (level) => {
   if (level < minOperationalCapacitorLevel) {
     return capacitorLevel <= level ? '\u25A1' : '\u25D9';
   } else {
-    // return capacitorLevel <= level ? '\u200A\u200A\u25A1' : '\u25A3';
     return capacitorLevel <= level ? '\u25A1' : '\u25A0';
   }
 };
 const getCapacitorSpacePadding = () => getSpaces(38);
-
 const getChanceText = () => crackChance > 10 ? crackChance.toFixed(0) : ` ${crackChance.toFixed(0)}`;
 
 const getChanceMarkAtLevel = (level) => {
@@ -140,23 +140,65 @@ const configLinesSmall = [
 ];
 
 const getCrackingCallText = () => capacitorLevel >= minOperationalCapacitorLevel ?
-  `${getSpaces(20)}>>>  PRESS ENTER TO ATTEMPT CRACKING (${getChanceText()}%)  <<<` : `${getSpaces(20)}--- CHARGING... ---`;
+  `${getSpaces(10)}>>>  PRESS ENTER TO ATTEMPT CRACKING (${getChanceText()}%)  <<<` : `${getSpaces(20)}--- CHARGING... ---`;
 
 const gameLinesSmall = [...configLinesSmall,
   emptyLine, emptyLine, emptyLine,
   { text: getCrackingCallText, time: 1000 },
 ];
 
+const getGridRecalibrtionReverseProgress = () => '||||||||||||||||||||||';
+const RSA_LEN = 617;
+const GEN_LEN = 11;
+const crackingTime = 5000;
+
+const getKeyCrackingProgress = () => {
+  if (crackingStartedAt) {
+    const progress = (Date.now() - crackingStartedAt) / crackingTime;
+    const maxChunks = RSA_LEN / GEN_LEN;
+    const chunks = Array.from(Array(Math.ceil(maxChunks * progress))).map(() => {
+      const chunk = Math.random().toString(36).slice(2);
+      return Math.random() < 0.5 ? chunk.toUpperCase() : chunk;
+    });
+
+    return chunks.join('');
+  } else {
+    crackingStartedAt = Date.now();
+    return '';
+  }
+};
+
+const LOCKED_SIGNATURES_TEXT = 'RECALIBRATING...';
+const getSignaturesText = () => siganturesLocked ? LOCKED_SIGNATURES_TEXT : discoverableSignatures.toString();
 const gameLinesBig = [
-  { text: () => 'LODG Power Circuit Maintenance and Repair 1.0', time: 500, },
-  emptyLine,
-  { text: () => `Discoverable Signatures: ${discoverableSignatures.toString()}`, time: 500, callback: () => setLargeFontStyles() },
+  { text: () => 'LODG Power Circuit Maintenance and Repair 1.0', time: 500 },
   emptyLine,
   { text: () => `Time To Lockdown: ${getTimeToLockDown()}`, time: 500, callback: () => setHugeFontStyles() },
+  { text: () => `Discoverable Signatures: ${getSignaturesText()}`, time: 500, callback: () => setHugeFontStyles() },
+  // { text: () => `\uD83D\uDD12 Grid Recalibration: ${getGridRecalibrtionReverseProgress()}`, time: 500, callback: () => setLargeFontStyles() },
   emptyLine, emptyLine, emptyLine, emptyLine, emptyLine, emptyLine,
   emptyLine, emptyLine, emptyLine, emptyLine, emptyLine, emptyLine,
   emptyLine, emptyLine, emptyLine, emptyLine, emptyLine, emptyLine,
   { text: () => `${getSpaces(70)}Grid frequency: ${frequencySelected}Hz`, time: 500, callback: () => setDefaultFontStyles() },
+];
+
+const crackBigLines = [
+  emptyLine, emptyLine, emptyLine, emptyLine, emptyLine, emptyLine, emptyLine,
+  { text: () => `${getSpaces(8)}------ KEY CRACKING IN PROGRESS ------`, time: 100, callback: () => setHugeFontStyles() },
+  { text: () => getKeyCrackingProgress(), time: 100 },
+  emptyLine,
+];
+
+const loseBigLines = [
+  emptyLine, emptyLine, emptyLine, emptyLine, emptyLine, emptyLine,
+  emptyLine, emptyLine, emptyLine, emptyLine, emptyLine, emptyLine,
+  { text: () => '------ SYSTEM LOCKDOWN IN EFFECT ------', time: 2000, callback: () => setHugeFontStyles() },
+  { text: () => '------ DATA WIPE: ||||||||||||||||||||||| 100% DONE ------', time: 3000, callback: () => setHugeFontStyles() },
+  { text: () => '------ EMERGENCY DECOMPRESSION STARTED ------', time: 2000, callback: () => setHugeFontStyles() },
+  emptyLine, emptyLine,
+
+  { text: () => `${getSpaces(30)}>>> PRESS ENTER TO TRY AGAIN <<<`, time: 500, callback: () => setLargeFontStyles() },
+  emptyLine,
 ];
 
 const displayLineAndQueueNext = (canvas, lines, i, fx, fy, noBuzz, noDelay) => {
@@ -177,7 +219,7 @@ const displayLineAndQueueNext = (canvas, lines, i, fx, fy, noBuzz, noDelay) => {
     redrawPrev(i);
   };
 
-  (lines[i].callback || (() => {}))();
+  (lines[i].callback || (() => {}))(lines[i]);
   if (!noDelay) fillTextGradually(ctx, lineText, lines[i].time, fx(i), fy(i, lines), 0, noBuzz, redrawPrevious, i);
   if (noDelay) fillTextImmediately(ctx, lineText, fx(i), fy(i, lines));
 
@@ -242,14 +284,21 @@ function clearSmallScreen() {
   smallCanvas.ctx.clearRect(0, 0, smallCanvas.WIDTH, smallCanvas.HEIGHT);
 }
 
+let redrawIntervalId;
 function startRefreshInterval(interval, gameState) {
-  setInterval(() => refreshScreens(gameState), interval);
+  redrawIntervalId = setInterval(() => refreshScreens(gameState), interval);
+}
+
+function resetRefreshInterval(interval, gameState) {
+  clearInterval(redrawIntervalId);
+  startRefreshInterval(interval, gameState);
 }
 
 function refreshScreens(gameState) {
   const refreshMap = {
     config: { small: configLinesSmall, big: configLinesBig },
     discovery: { small: gameLinesSmall, big: gameLinesBig, board: true },
+    cracking: { small: gameLinesSmall, big: crackBigLines },
   };
 
   const refreshRequirement = refreshMap[gameState] || {};
@@ -265,7 +314,6 @@ function refreshScreens(gameState) {
   if (refreshRequirement.board) {
     BoardService.refreshBoard(bigCanvas.ctx);
   }
-
 }
 
 function setDefaultFontStyles() {
@@ -322,11 +370,26 @@ export default {
     const gameBigLines = Object.assign([], gameLinesBig);
     gameBigLines[gameBigLines.length - 1].callback = doneCallback;
 
-    displayLineAndQueueNext(bigCanvas, [...gameBigLines], 0, getBigLineX, getLineY);
+    displayLineAndQueueNext(bigCanvas, gameBigLines, 0, getBigLineX, getLineY);
     displayLineAndQueueNext(smallCanvas, gameLinesSmall, 0, getSmallLineX, getLineY, true, true);
     BoardService.initBoard(frequencySelected, discoverableSignatures);
     // setTimeout(() => BoardService.refreshBoard(bigCanvas.ctx), 2000);
     startRefreshInterval(12, gameState);
+  },
+
+  drawLose: (doneCallback) => {
+    const loseLinesBig = Object.assign([], loseBigLines);
+    loseLinesBig[loseLinesBig.length - 1].callback = doneCallback;
+
+    displayLineAndQueueNext(bigCanvas, loseLinesBig, 0, getBigLineX, getLineY);
+  },
+
+  drawCracking: (crackingSucceded, doneCallback, gameState) => {
+    resetRefreshInterval(12, gameState);
+    const crackLinesBig = Object.assign([], crackBigLines);
+    crackLinesBig[crackLinesBig.length - 1].callback = doneCallback;
+
+    displayLineAndQueueNext(bigCanvas, crackLinesBig, 0, getBigLineX, getLineY);
   },
 
   clearScreens: () => {
@@ -360,5 +423,15 @@ export default {
       frequencySelected = frequency;
       refreshScreens(gameState);
     }
+  },
+
+  unfoldNextSolarArray: () => {
+    const unFoldedArray = document.querySelector('.station-scheme .solar-array.folded');
+    unFoldedArray.classList.remove('folded');
+    AudioService.playArrayUnfoldSound();
+  },
+
+  lockSignatures: (lock) => {
+    siganturesLocked = lock;
   },
 };
