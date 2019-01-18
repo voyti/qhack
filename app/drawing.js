@@ -4,7 +4,8 @@ import BoardService from './board.js';
 const LINE_HEIGHT = 30;
 const FONT_COLOR = '#C3E591';
 const LINE_MARGIN_Y = 50;
-const LINE_DRAW_TIME_WARP = 5;
+const LINE_DRAW_TIME_WARP = 1;
+// const LINE_DRAW_TIME_WARP = 5;
 
 let frequencySelected;
 let solarArraysOnline;
@@ -22,6 +23,8 @@ let crackingStartedAt;
 
 let smallDisplayLocked = false;
 let siganturesLocked = false;
+let crackingSucceded = false;
+let drawingRefreshInterval = 33;
 
 let bigCanvas = {
   WIDTH: 1025,
@@ -168,6 +171,16 @@ const getKeyCrackingProgress = () => {
   }
 };
 
+const getKeyCrackingEffect = () => {
+  if (crackingSucceded) {
+    return 'MATCHING KEY FOUND! GRANTED ACCESS TO ROLE: CRITICAL';
+  } else {
+    return 'NO MATCH FOUND, TRY AGAIN';
+  }
+};
+
+
+
 const LOCKED_SIGNATURES_TEXT = 'RECALIBRATING...';
 const getSignaturesText = () => siganturesLocked ? LOCKED_SIGNATURES_TEXT : discoverableSignatures.toString();
 const gameLinesBig = [
@@ -185,23 +198,29 @@ const gameLinesBig = [
 const crackBigLines = [
   emptyLine, emptyLine, emptyLine, emptyLine, emptyLine, emptyLine, emptyLine,
   { text: () => `${getSpaces(8)}------ KEY CRACKING IN PROGRESS ------`, time: 100, callback: () => setHugeFontStyles() },
-  { text: () => getKeyCrackingProgress(), time: 100 },
+  { text: () => getKeyCrackingProgress(), time: crackingTime },
+  { text: () => getKeyCrackingProgress(), time: crackingTime },
+  { text: () => getKeyCrackingProgress(), time: crackingTime },
+  { text: () => getKeyCrackingProgress(), time: crackingTime },
+  { text: () => getKeyCrackingProgress(), time: crackingTime },
+  { text: () => getKeyCrackingProgress(), time: crackingTime },
   emptyLine,
+  { text: () => `${getSpaces(20)}${getKeyCrackingEffect()}`, time: crackingTime },
 ];
 
 const loseBigLines = [
   emptyLine, emptyLine, emptyLine, emptyLine, emptyLine, emptyLine,
-  emptyLine, emptyLine, emptyLine, emptyLine, emptyLine, emptyLine,
-  { text: () => '------ SYSTEM LOCKDOWN IN EFFECT ------', time: 2000, callback: () => setHugeFontStyles() },
-  { text: () => '------ DATA WIPE: ||||||||||||||||||||||| 100% DONE ------', time: 3000, callback: () => setHugeFontStyles() },
-  { text: () => '------ EMERGENCY DECOMPRESSION STARTED ------', time: 2000, callback: () => setHugeFontStyles() },
+  emptyLine, emptyLine, emptyLine,
+  { text: () => '         ------ SYSTEM LOCKDOWN IN EFFECT ------', time: 2000, callback: () => setHugeFontStyles() },
+  { text: () => '    -- DATA WIPE: ||||||||||||||||||||||| 100% DONE --', time: 3000, callback: () => setHugeFontStyles() },
+  { text: () => '       ------ EMERGENCY DECOMPRESSION STARTED ------', time: 2000, callback: () => setHugeFontStyles() },
   emptyLine, emptyLine,
 
   { text: () => `${getSpaces(30)}>>> PRESS ENTER TO TRY AGAIN <<<`, time: 500, callback: () => setLargeFontStyles() },
   emptyLine,
 ];
 
-const displayLineAndQueueNext = (canvas, lines, i, fx, fy, noBuzz, noDelay) => {
+const displayLineAndQueueNext = (canvas, lines, i, fx, fy, noBuzz, noDelay, doneCallback) => {
   setDefaultFontStyles();
   if (i === 0 && !noDelay) canvas.isLocked = true;
 
@@ -214,7 +233,7 @@ const displayLineAndQueueNext = (canvas, lines, i, fx, fy, noBuzz, noDelay) => {
   const redrawPrevious = (i) => {
     const redrawPrev = (i) => {
       ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-      if (i > 0) displayLineAndQueueNext(canvas, lines.slice(0, i), 0, fx, fy, noBuzz, true);
+      if (i > 0) displayLineAndQueueNext(canvas, lines.slice(0, i), 0, fx, fy, noBuzz, true, doneCallback);
     };
     redrawPrev(i);
   };
@@ -226,11 +245,12 @@ const displayLineAndQueueNext = (canvas, lines, i, fx, fy, noBuzz, noDelay) => {
   if (lines[i + 1]) {
     if (!noDelay) {
       setTimeout(() =>
-        ((i) => displayLineAndQueueNext(canvas, lines, i, fx, fy, noBuzz, noDelay))(i + 1), delayTime / LINE_DRAW_TIME_WARP);
+        ((i) => displayLineAndQueueNext(canvas, lines, i, fx, fy, noBuzz, noDelay, doneCallback))(i + 1), delayTime / LINE_DRAW_TIME_WARP);
     }
-    if (noDelay) displayLineAndQueueNext(canvas, lines, i + 1, fx, fy, noBuzz, noDelay);
+    if (noDelay) displayLineAndQueueNext(canvas, lines, i + 1, fx, fy, noBuzz, noDelay, doneCallback);
   } else if (!noDelay) {
     canvas.isLocked = false;
+    (doneCallback || (() => {}))();
   }
 };
 
@@ -289,8 +309,12 @@ function startRefreshInterval(interval, gameState) {
   redrawIntervalId = setInterval(() => refreshScreens(gameState), interval);
 }
 
-function resetRefreshInterval(interval, gameState) {
+function breakRefreshIntervalLoop() {
   clearInterval(redrawIntervalId);
+}
+
+function resetRefreshInterval(interval, gameState) {
+  breakRefreshIntervalLoop();
   startRefreshInterval(interval, gameState);
 }
 
@@ -350,46 +374,38 @@ export default {
   setSmallScreenStateLoaded: () => smallCanvas.element.classList.add('loaded'),
 
   drawInitConnection: (doneCallback) => {
-    initLinesBig[initLinesBig.length - 1].callback = doneCallback;
-
-    displayLineAndQueueNext(bigCanvas, initLinesBig, 0, getBigLineX, getLineY);
+    breakRefreshIntervalLoop();
+    displayLineAndQueueNext(bigCanvas, initLinesBig, 0, getBigLineX, getLineY, false, false, doneCallback);
     displayLineAndQueueNext(smallCanvas, initLinesSmall, 0, getSmallLineX, getLineY, true);
   },
 
   drawConfig: (doneCallback) => {
-    const configSmallLines = Object.assign([], configLinesSmall);
-    configSmallLines[configSmallLines.length - 1].callback = doneCallback;
-
-    displayLineAndQueueNext(bigCanvas, [...configLinesBig], 0, getBigLineX, getLineY);
-    displayLineAndQueueNext(smallCanvas, configSmallLines, 0, getSmallLineX, getLineY, true);
+    breakRefreshIntervalLoop();
+    displayLineAndQueueNext(bigCanvas, configLinesBig, 0, getBigLineX, getLineY, false, false, doneCallback);
+    displayLineAndQueueNext(smallCanvas, configLinesSmall, 0, getSmallLineX, getLineY);
 
     setTimeout(() => displayStationScheme(), 2000);
   },
 
   drawDiscovery: (doneCallback, gameState) => {
-    const gameBigLines = Object.assign([], gameLinesBig);
-    gameBigLines[gameBigLines.length - 1].callback = doneCallback;
-
-    displayLineAndQueueNext(bigCanvas, gameBigLines, 0, getBigLineX, getLineY);
+    breakRefreshIntervalLoop();
+    displayLineAndQueueNext(bigCanvas, gameLinesBig, 0, getBigLineX, getLineY, false, false, doneCallback);
     displayLineAndQueueNext(smallCanvas, gameLinesSmall, 0, getSmallLineX, getLineY, true, true);
     BoardService.initBoard(frequencySelected, discoverableSignatures);
     // setTimeout(() => BoardService.refreshBoard(bigCanvas.ctx), 2000);
-    startRefreshInterval(12, gameState);
+    startRefreshInterval(drawingRefreshInterval, gameState);
   },
 
   drawLose: (doneCallback) => {
-    const loseLinesBig = Object.assign([], loseBigLines);
-    loseLinesBig[loseLinesBig.length - 1].callback = doneCallback;
-
-    displayLineAndQueueNext(bigCanvas, loseLinesBig, 0, getBigLineX, getLineY);
+    breakRefreshIntervalLoop();
+    displayLineAndQueueNext(bigCanvas, loseBigLines, 0, getBigLineX, getLineY, false, false, doneCallback);
   },
 
-  drawCracking: (crackingSucceded, doneCallback, gameState) => {
-    resetRefreshInterval(12, gameState);
-    const crackLinesBig = Object.assign([], crackBigLines);
-    crackLinesBig[crackLinesBig.length - 1].callback = doneCallback;
-
-    displayLineAndQueueNext(bigCanvas, crackLinesBig, 0, getBigLineX, getLineY);
+  drawCracking: (_crackingSucceded, doneCallback, gameState) => {
+    resetRefreshInterval(drawingRefreshInterval, gameState);
+    crackingSucceded = _crackingSucceded;
+    displayLineAndQueueNext(bigCanvas, crackBigLines, 0, getBigLineX, getLineY, false, false,
+      (crackingSucceded) => doneCallback(crackingSucceded));
   },
 
   clearScreens: () => {
@@ -434,4 +450,5 @@ export default {
   lockSignatures: (lock) => {
     siganturesLocked = lock;
   },
+
 };

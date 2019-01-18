@@ -21,7 +21,7 @@ let onSolarArrayUnfold = () => {};
 const partyMoveSpeed = 1000;
 let lastPartyMoveTimestamp = Date.now();
 
-const chanceForDiscoverableSignature = 0.1;
+const chanceForDiscoverableSignature = 0;
 
 let partyQueuedDestinations = [];
 let currentPartyDestination = {};
