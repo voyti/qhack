@@ -149,6 +149,10 @@ let arrayUnfoldSound = null;
 let secondSound = null;
 let proceeding1Sound = null;
 let proceeding2Sound = null;
+let departureSound = null;
+let blink1Sound = null;
+let blink2Sound = null;
+let blink3Sound = null;
 
 function init() {
   const powerOn = document.querySelector('.power-on-sound');
@@ -163,6 +167,10 @@ function init() {
   secondSound = document.querySelector('.second-sound');
   proceeding1Sound = document.querySelector('.proceeding-1-sound');
   proceeding2Sound = document.querySelector('.proceeding-2-sound');
+  departureSound = document.querySelector('.departure-sound');
+  blink1Sound = document.querySelector('.blink-1-sound');
+  blink2Sound = document.querySelector('.blink-2-sound');
+  blink3Sound = document.querySelector('.blink-3-sound');
 }
 
 function playFrequency(frequency, duration) {
@@ -203,6 +211,10 @@ export default {
 
   playProceeding1Sound: () => proceeding1Sound && proceeding1Sound.play(),
   playProceeding2Sound: () => proceeding2Sound && proceeding2Sound.play(),
+  playDepartureSound: () => departureSound && departureSound.play(),
+  playBlink1Sound: () => blink1Sound && blink1Sound.play(),
+  playBlink2Sound: () => blink2Sound && blink2Sound.play(),
+  playBlink3Sound: () => blink3Sound && blink3Sound.play(),
 
   playMelody: () => {
     playSequence([...MELODY, ...MELODY, ...MELODY, ...MELODY], 0);

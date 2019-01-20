@@ -45,11 +45,25 @@
 
 .station {
   position: relative;
-  top: 80px;
-  left: 0;
+  top: 76px;
+  left: -3px;
   width: 10px;
-  transform: scale(8);
+  transform: scale(8.6);
   transform-origin: left;
+}
+
+.shuttle {
+  position: absolute;
+  transform: scale(0.04);
+  left: -60px;
+  top: -7px;
+  will-change: top;
+}
+
+.shuttle.departed {
+  animation: shuttle-departure 7s;
+  animation-timing-function: cubic-bezier(0.15, 0.22, 0.79, -0.18);
+  animation-fill-mode: forwards;
 }
 
 .solar-array {
@@ -122,4 +136,9 @@ transform-origin: top;
 @keyframes scan-display-downwards {
   0% { height: 0 }
   100% { height: 300px }
+}
+
+@keyframes shuttle-departure {
+  0% { top: -7px; }
+  100% { top: 70px; }
 }

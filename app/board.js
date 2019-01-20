@@ -15,21 +15,33 @@ const DISCOVERABILITY_RANGE = 2;
 const MAX_VULNERABLE_NODES = 8;
 const SECOND = 1000;
 
-let gridFrequency;
-let discoverableSignatures;
-let onSolarArrayUnfold = () => {};
-const partyMoveSpeed = 1000;
-let lastPartyMoveTimestamp = Date.now();
 
 const chanceForDiscoverableSignature = 0;
+const partyMoveSpeed = 1000;
+let partyPosition = { col: 6, row: 5 };
 
-let partyQueuedDestinations = [];
-let currentPartyDestination = {};
-const partyPosition = { col: 6, row: 5 };
+let partyQueuedDestinations;
+let currentPartyDestination;
+let discoveredNodes;
+let vulnerableNodes;
+let isBoardLocked;
+let gridFrequency;
+let discoverableSignatures;
+let onSolarArrayUnfold;
+let lastPartyMoveTimestamp;
+let boardPaused;
 
-let discoveredNodes = [];
-let vulnerableNodes = [];
-let isBoardLocked = false;
+function resetGameStateValues() {
+  partyQueuedDestinations = [];
+  currentPartyDestination = {};
+  discoveredNodes = [];
+  vulnerableNodes = [];
+  isBoardLocked = false;
+  onSolarArrayUnfold = () => {};
+  lastPartyMoveTimestamp = Date.now();
+  partyPosition = { col: 6, row: 5 };
+  boardPaused = false;
+}
 
 const isNodeOutOfRange = (node) => {
   const nodesInRange =
@@ -214,14 +226,17 @@ function isSamePosition(posA, posB) {
 }
 
 export default {
-  initBoard: (frequencySelected, initialDiscoverableSignatures) => {
+  initBoard: (frequencySelected, initialDiscoverableSignatures, onSolarArrayUnfoldCb) => {
+    resetGameStateValues();
+    onSolarArrayUnfold = onSolarArrayUnfoldCb;
     vulnerableNodes = getVulnerableNodes();
     discoveredNodes = NODE_MAP.filter((node) => node.meta === 'starting');
     gridFrequency = frequencySelected;
     discoverableSignatures = initialDiscoverableSignatures;
   },
 
-  refreshBoard(ctx) {
+  refreshBoard(ctx) { // eslint-disable-line consistent-return
+    if (boardPaused) return false;
     NODE_MAP.forEach((node, i) => {
       ctx.fillStyle = node.color(node, i);
       ctx.fillRect((node.col * NODE_SHIFT) + BOARD_LEFT, (node.row * NODE_SHIFT) + BOARD_TOP, NODE_SIDE, NODE_SIDE);
@@ -290,11 +305,11 @@ export default {
     discoverableSignatures = newDiscoverableSignatures;
   },
 
-  registerOnSolarArrayUnfoldCallback: (onSolarArrayUnfoldCb) => {
-    onSolarArrayUnfold = onSolarArrayUnfoldCb;
-  },
-
   lockSignatures: (lock) => {
     isBoardLocked = lock;
+  },
+
+  pauseBoard: (pause) => {
+    boardPaused = pause;
   },
 };
