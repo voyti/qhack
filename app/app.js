@@ -16,7 +16,7 @@ const maxQubits = 80;
 const chargePerQubit = maxCharge / maxQubits;
 const powerPerSolarArray = 10;
 const maxTimeToLockdown = 300000;
-const penaltyPeriod = 1000;
+const basePenaltyPeriod = 1000;
 const loopRefreshRateMillis = 1000;
 
 let qubitsOperational;
@@ -35,7 +35,6 @@ let capacitorLevel1Reached;
 let capacitorLevel2Reached;
 let capacitorLevel3Reached;
 let boardLocked;
-let baseCrackingChance;
 let masterLoopCount;
 
 function resetGameStateValues() {
@@ -55,12 +54,9 @@ function resetGameStateValues() {
   capacitorLevel2Reached = false;
   capacitorLevel3Reached = false;
   boardLocked = false;
-  baseCrackingChance = 0;
   masterLoopCount = 0;
 
   window.devSetBasePower = (power) => (basePower = power);
-  window.devSetBaseCrackingChance = (chance) => (baseCrackingChance = chance);
-  window.devSkipIntro = () => initializePhaseTerminal();
 }
 
 function frequencyChange(direction) {
@@ -78,7 +74,23 @@ function frequencyChange(direction) {
   }
 }
 
-const getSignatureRecalibrationPeriod = () => 2000 * 1 / frequencySelected;
+const getSignatureRecalibrationPeriod = () => {
+  const frequencyToRecalibrationMap = {
+    0.5: 2000,
+    1: 2000,
+    2: 1000,
+  };
+  return frequencyToRecalibrationMap[frequencySelected];
+};
+
+function getPenaltyPeriod() {
+  const frequencyToRecalibrationMap = {
+    0.5: basePenaltyPeriod,
+    1: 5 * basePenaltyPeriod,
+    2: 5 * basePenaltyPeriod,
+  };
+  return frequencyToRecalibrationMap[frequencySelected];
+}
 
 function generateDiscoverablesignatures() {
   return Math.random().toString(36).slice(2, 5).toUpperCase().split('');
@@ -104,7 +116,10 @@ function init(startAtConfig) {
   initializePowerManager();
   if (!startAtConfig) initializePhaseTerminal();
   // initializePhaseConfig();
-  if (startAtConfig) initializePhaseConfig();
+  if (startAtConfig) {
+    setGameState('preconfig');
+    initializePhaseConfig();
+  }
   // initializePhaseDiscovery();
 
   const alphabeticalMatcher = (char) => char.match(/[A-Za-z0-9]/);
@@ -116,6 +131,7 @@ function init(startAtConfig) {
       38: 'up',
       40: 'down',
     };
+    if (e.keyCode === 187) window.devSetTextTimeWarp(10);
 
     if (inputMap[e.keyCode] === 'enter') {
       if (gameState === 'postwin') {
@@ -142,7 +158,7 @@ function init(startAtConfig) {
     if (gameState === 'discovery') {
       if (alphabeticalMatcher(e.key) && !boardLocked) {
         BoardService.applyInput(e.key, (wrongInput) => {
-          if (wrongInput) accruedPenalty += penaltyPeriod;
+          if (wrongInput) accruedPenalty += getPenaltyPeriod();
           setBoardLocked(true);
 
           setTimeout(() => {
@@ -180,12 +196,15 @@ function initializePowerManager() {
 
 function resetCharge() {
   chargeAvailable = 0;
+  capacitorLevel1Reached = false;
+  capacitorLevel2Reached = false;
+  capacitorLevel3Reached = false;
 }
 
 function getGameDataForDrawing() {
   powerAvailable = getPower();
-  chargeAvailable += capacitorChargePerSecond();
-  if (chargeAvailable > maxCharge) chargeAvailable -= chargeAvailable - (maxCharge * 0.1);
+  chargeAvailable += timePaused ? 0 : capacitorChargePerSecond();
+  if (chargeAvailable >= maxCharge * 1.1) chargeAvailable -= (maxCharge * Math.random() * 0.2);
   capacitorLevel = Math.floor(chargeAvailable / maxCharge * maxCapacitorLevel);
   crackChance = maxCrackChance * (capacitorLevel / maxCapacitorLevel);
   handleCapacitorThresholdLevels();
@@ -209,7 +228,7 @@ function handleCapacitorThresholdLevels() {
     capacitorLevel1Reached = true;
   }
 
-  if (capacitorLevel > Math.floor(maxCapacitorLevel / 2) && !capacitorLevel2Reached) {
+  if (capacitorLevel > Math.floor(maxCapacitorLevel / 1.5) && !capacitorLevel2Reached) {
     AudioService.playBlink2Sound();
     capacitorLevel2Reached = true;
   }
@@ -222,9 +241,11 @@ function handleCapacitorThresholdLevels() {
 
 function refreshGameDataLoop(loopCount) {
   masterLoopCount = loopCount || 0;
-  const nextLoopCount = gameState === 'discovery' ? masterLoopCount + 1 : _loopCount;
-
+  const shouldCountTime = gameState === 'discovery' && !timePaused;
+  const nextLoopCount = shouldCountTime ? masterLoopCount + 1 : masterLoopCount;
   timeElapsed = gameState === 'discovery' ? loopRefreshRateMillis * masterLoopCount + accruedPenalty : 0;
+
+
   if (timeElapsed > maxTimeToLockdown * 0.7) AudioService.playSecondSound();
   if (timeElapsed >= maxTimeToLockdown) initializePhaseLose();
 
@@ -245,7 +266,7 @@ function attemptCracking() {
   if (capacitorLevel >= minOperationalCapacitorLevel) {
     setGameState('cracking');
     timePaused = true;
-    const crackingSucceded = baseCrackingChance + (crackChance / 100 > Math.random());
+    const crackingSucceded = (crackChance / 100 > Math.random());
     console.warn('Cracking: crackChance, ', crackChance, ', crackingSucceded: ', crackingSucceded);
 
     DrawingService.clearScreens();
@@ -255,7 +276,6 @@ function attemptCracking() {
     DrawingService.drawCracking(crackingSucceded, (crackingSucceded) => {
       resetCharge();
       // setGameState('cracking');
-
       if (crackingSucceded) {
         setGameState('postwin');
       } else {
@@ -286,6 +306,7 @@ function initializePhaseConfig() {
 }
 
 function initializePhaseDiscovery() {
+  if (window.devSetTextTimeWarp) window.devSetTextTimeWarp(1);
   setGameState('prediscovery');
 
   const doneCallback = (line) => {
@@ -305,6 +326,7 @@ function initializePhaseDiscovery() {
 }
 
 function resumeDiscovery() {
+  timePaused = false;
   setGameState('discovery');
   DrawingService.clearScreens();
   BoardService.pauseBoard(false);

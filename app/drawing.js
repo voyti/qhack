@@ -4,7 +4,7 @@ import BoardService from './board.js';
 const LINE_HEIGHT = 30;
 const FONT_COLOR = '#C3E591';
 const LINE_MARGIN_Y = 50;
-const LINE_DRAW_TIME_WARP = 1;
+let LINE_DRAW_TIME_WARP = 1;
 // const LINE_DRAW_TIME_WARP = 5;
 
 let frequencySelected;
@@ -27,24 +27,36 @@ let crackingSucceded;
 let drawingRefreshInterval;
 let drawingTickCounter;
 let redrawIntervalId;
+let savedChunks;
+
+let bigCanvas = {
+  WIDTH: 1025,
+  HEIGHT: 768,
+};
+
+let smallCanvas = {
+  WIDTH: 721,
+  HEIGHT: 484,
+};
 
 function resetGameStateValues() {
   smallDisplayLocked = false;
   siganturesLocked = false;
   crackingSucceded = false;
-  drawingRefreshInterval = 100;
+  drawingRefreshInterval = 87;
   drawingTickCounter = 0;
+  window.devSetTextTimeWarp = (warp) => (LINE_DRAW_TIME_WARP = warp);
+  savedChunks = [];
+  lastTimeToLockDownUpdate = 0;
+  bigCanvas = {
+    WIDTH: 1025,
+    HEIGHT: 768,
+  };
+  smallCanvas = {
+    WIDTH: 721,
+    HEIGHT: 484,
+  };
 }
-
-const bigCanvas = {
-  WIDTH: 1025,
-  HEIGHT: 768,
-};
-
-const smallCanvas = {
-  WIDTH: 721,
-  HEIGHT: 484,
-};
 
 const getSpaces = (num) => Array.from(Array(num)).map(() => ' ').join('');
 
@@ -77,19 +89,27 @@ const getCallToActionText = () => drawingTickCounter % 2 ? `${getSpaces(10)}>>> 
 const getCrackingCallText = () => capacitorLevel >= minOperationalCapacitorLevel ?
   getCallToActionText() : `${getSpaces(20)}--- CHARGING... ---`;
 
-const getGridRecalibrtionReverseProgress = () => '||||||||||||||||||||||';
-const RSA_LEN = 617;
-const GEN_LEN = 11;
-const crackingTime = 1000;
 
-const getKeyCrackingProgress = () => {
-  if (crackingStartedAt) {
-    const progress = Math.min((Date.now() - crackingStartedAt) / crackingTime, 5);
-    const maxChunks = 3; // RSA_LEN / GEN_LEN;
-    const chunks = Array.from(Array(Math.ceil(maxChunks * progress))).map(() => {
-      const chunk = Math.random().toString(36).slice(2);
-      return Math.random() < 0.5 ? chunk.toUpperCase() : chunk;
-    });
+const generateChunks = (numOfChunks) => {
+  return Array.from(Array(Math.ceil(numOfChunks))).map(() => {
+    const chunk = Math.random().toString(36).slice(2);
+    return Math.random() < 0.5 ? chunk.toUpperCase() : chunk;
+  });
+};
+
+const singleCrackingTime = 1000;
+const totalCrackingTime = 6000;
+const maxProgress = 7;
+
+const getKeyCrackingProgress = (i) => {
+  if (crackingStartedAt && (Date.now() - crackingStartedAt) > totalCrackingTime) {
+    const savedChunk = savedChunks[i] || generateChunks(maxProgress).join('');
+    if (!savedChunks[i]) savedChunks[i] = savedChunk;
+    return savedChunk;
+  } else if (crackingStartedAt) {
+    const progress = Math.min((Date.now() - crackingStartedAt) / singleCrackingTime, maxProgress);
+    const maxChunks = 1;
+    const chunks = generateChunks(maxChunks * progress);
 
     return chunks.join('');
   } else {
@@ -157,7 +177,7 @@ const configLinesBig = [
   { text: 'Pick frequency for grid node discovery', time: 1000 },
   emptyLine, hashLine, emptyLine,
   { text: 'MANUAL: Type one of the displayed Discoverable Signatures in time,', time: 500 },
-  { text: 'MANUAL: to match it with node signature displayed on the grid scheme', time: 500 },
+  { text: 'MANUAL: to match it with node signature displayed on the grid scheme.', time: 500 },
   { text: 'MANUAL: To attempt cracking the Master Key, press Enter when enough energy is stored', time: 500 },
   emptyLine, hashLine, emptyLine,
   { text: 'NOTE: Higher frequency will allow faster grid discovery', time: 1000 },
@@ -197,7 +217,6 @@ const gameLinesBig = [
   emptyLine,
   { text: () => `Time To Lockdown: ${getTimeToLockDown()}`, time: 500, callback: () => setHugeFontStyles() },
   { text: () => `Discoverable Signatures: ${getSignaturesText()}`, time: 500, callback: () => setHugeFontStyles() },
-  // { text: () => `\uD83D\uDD12 Grid Recalibration: ${getGridRecalibrtionReverseProgress()}`, time: 500, callback: () => setLargeFontStyles() },
   emptyLine, emptyLine, emptyLine, emptyLine, emptyLine, emptyLine,
   emptyLine, emptyLine, emptyLine, emptyLine, emptyLine, emptyLine,
   emptyLine, emptyLine, emptyLine, emptyLine, emptyLine, emptyLine,
@@ -207,14 +226,14 @@ const gameLinesBig = [
 const crackBigLines = [
   emptyLine, emptyLine, emptyLine, emptyLine, emptyLine, emptyLine, emptyLine,
   { text: () => `${getSpaces(8)}------ KEY CRACKING IN PROGRESS ------`, time: 100, callback: () => setHugeFontStyles() },
-  { text: () => getKeyCrackingProgress(), time: crackingTime / 5 },
-  { text: () => getKeyCrackingProgress(), time: crackingTime / 5 },
-  { text: () => getKeyCrackingProgress(), time: crackingTime / 5 },
-  { text: () => getKeyCrackingProgress(), time: crackingTime / 5 },
-  { text: () => getKeyCrackingProgress(), time: crackingTime / 5 },
+  { text: () => getKeyCrackingProgress(0), time: totalCrackingTime / 5 },
+  { text: () => getKeyCrackingProgress(1), time: totalCrackingTime / 5 },
+  { text: () => getKeyCrackingProgress(2), time: totalCrackingTime / 5 },
+  { text: () => getKeyCrackingProgress(3), time: totalCrackingTime / 5 },
+  { text: () => getKeyCrackingProgress(4), time: totalCrackingTime / 5 },
   emptyLine,
-  { text: () => `${getSpaces(20)}${getKeyCrackingEffect()}`, time: 3000 },
-  { text: () => crackingSucceded ? `${getSpaces(20)}MISSION DATA STORE TRANSFER: |||||||||| 100%` : '', time: () => crackingSucceded ? 6000 : 1000 },
+  { text: () => `${getSpaces(20)}${getKeyCrackingEffect()}`, time: 2000 },
+  { text: () => crackingSucceded ? `${getSpaces(20)}MISSION DATA STORE TRANSFER: |||||||||| 100%` : '', time: () => crackingSucceded ? 4000 : 1000 },
   { text: () => crackingSucceded ? `${getSpaces(28)} >>> PRESS ENTER TO EXIT <<<` : '', time: 3000 },
 ];
 
@@ -447,11 +466,12 @@ export default {
 
   drawCracking: (_crackingSucceded, doneCallback, gameState) => {
     breakRefreshIntervalLoop();
-
-    // resetRefreshInterval(drawingRefreshInterval, gameState);
     crackingSucceded = _crackingSucceded;
+
     displayLineAndQueueNext(bigCanvas, crackBigLines, 0, getBigLineX, getLineY, false, false,
       () => {
+        savedChunks = [];
+        crackingStartedAt = null;
         doneCallback(crackingSucceded);
         if (crackingSucceded) departShuttle();
       });

@@ -15,7 +15,6 @@ const DISCOVERABILITY_RANGE = 2;
 const MAX_VULNERABLE_NODES = 8;
 const SECOND = 1000;
 
-
 const chanceForDiscoverableSignature = 0;
 const partyMoveSpeed = 1000;
 let partyPosition = { col: 6, row: 5 };

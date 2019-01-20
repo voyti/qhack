@@ -171,9 +171,9 @@ function init() {
   blink1Sound = document.querySelector('.blink-1-sound');
   blink2Sound = document.querySelector('.blink-2-sound');
   blink3Sound = document.querySelector('.blink-3-sound');
-  blink1Sound.volume = 0.7;
-  blink2Sound.volume = 0.7;
-  blink3Sound.volume = 0.7;
+  blink1Sound.volume = 0.5;
+  blink2Sound.volume = 0.5;
+  blink3Sound.volume = 0.5;
 
 }
 
