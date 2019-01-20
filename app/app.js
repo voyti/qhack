@@ -224,7 +224,7 @@ function refreshGameDataLoop(loopCount) {
   masterLoopCount = loopCount || 0;
   const nextLoopCount = gameState === 'discovery' ? masterLoopCount + 1 : _loopCount;
 
-  timeElapsed = gameState === 'discovery' ? loopRefreshRateMillis * _loopCount + accruedPenalty : 0;
+  timeElapsed = gameState === 'discovery' ? loopRefreshRateMillis * masterLoopCount + accruedPenalty : 0;
   if (timeElapsed > maxTimeToLockdown * 0.7) AudioService.playSecondSound();
   if (timeElapsed >= maxTimeToLockdown) initializePhaseLose();
 
