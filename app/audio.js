@@ -156,11 +156,9 @@ let blink3Sound = null;
 
 function init() {
   const powerOn = document.querySelector('.power-on-sound');
-  powerOn.volume = 0.3;
+  powerOn.volume = 0.4;
 
   buzzSound = document.querySelector('.buzz-sound');
-  buzzSound.volume = 0.9;
-
   thudSound = document.querySelector('.thud-sound');
   popSound = document.querySelector('.pop-sound');
   arrayUnfoldSound = document.querySelector('.array-unfold-sound');

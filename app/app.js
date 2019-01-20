@@ -34,6 +34,8 @@ let timePaused;
 let capacitorLevel1Reached;
 let capacitorLevel2Reached;
 let capacitorLevel3Reached;
+let boardLocked;
+let baseCrackingChance;
 
 function resetGameStateValues() {
   qubitsOperational = 0;
@@ -51,6 +53,11 @@ function resetGameStateValues() {
   capacitorLevel1Reached = false;
   capacitorLevel2Reached = false;
   capacitorLevel3Reached = false;
+  boardLocked = false;
+  baseCrackingChance = 0;
+
+  window.devSetBasePower = (power) => (basePower = power);
+  window.devSetBaseCrackingChance = (chance) => (baseCrackingChance = chance);
 }
 
 
@@ -85,10 +92,6 @@ function generateUniqueDiscoverablesignatures() {
   }
 }
 
-
-
-let boardLocked = false;
-
 function init(startAtConfig) {
   resetGameStateValues();
   DrawingService.setFrequencyData(frequencySelected, gameState);
@@ -97,7 +100,7 @@ function init(startAtConfig) {
   DrawingService.clearScreens();
 
   initializePowerManager();
-  initializePhaseTerminal();
+  if (!startAtConfig) initializePhaseTerminal();
   // initializePhaseConfig();
   if (startAtConfig) initializePhaseConfig();
   // initializePhaseDiscovery();
@@ -240,7 +243,7 @@ function attemptCracking() {
   if (capacitorLevel >= minOperationalCapacitorLevel) {
     setGameState('cracking');
     timePaused = true;
-    const crackingSucceded = crackChance / 100 > Math.random();
+    const crackingSucceded = baseCrackingChance + (crackChance / 100 > Math.random());
     console.warn('Cracking: crackChance, ', crackChance, ', crackingSucceded: ', crackingSucceded);
 
     DrawingService.clearScreens();
