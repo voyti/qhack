@@ -159,6 +159,8 @@ function init() {
   powerOn.volume = 0.4;
 
   buzzSound = document.querySelector('.buzz-sound');
+  powerOn.volume = 1;
+
   thudSound = document.querySelector('.thud-sound');
   popSound = document.querySelector('.pop-sound');
   arrayUnfoldSound = document.querySelector('.array-unfold-sound');
@@ -169,6 +171,10 @@ function init() {
   blink1Sound = document.querySelector('.blink-1-sound');
   blink2Sound = document.querySelector('.blink-2-sound');
   blink3Sound = document.querySelector('.blink-3-sound');
+  blink1Sound.volume = 0.7;
+  blink2Sound.volume = 0.7;
+  blink3Sound.volume = 0.7;
+
 }
 
 function playFrequency(frequency, duration) {

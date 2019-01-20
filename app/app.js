@@ -5,8 +5,8 @@ import BoardService from './board.js';
 let gameState = 'preinit';
 
 const availableFrequencies = [0.5, 1, 2];
-const basePower = 1; // in kW
-// const basePower = 100; // in kW
+let basePower = 1; // in kW
+// let basePower = 100; // in kW
 
 const maxCrackChance = 80;
 const maxCapacitorLevel = 12;
@@ -36,6 +36,7 @@ let capacitorLevel2Reached;
 let capacitorLevel3Reached;
 let boardLocked;
 let baseCrackingChance;
+let masterLoopCount;
 
 function resetGameStateValues() {
   qubitsOperational = 0;
@@ -55,11 +56,12 @@ function resetGameStateValues() {
   capacitorLevel3Reached = false;
   boardLocked = false;
   baseCrackingChance = 0;
+  masterLoopCount = 0;
 
   window.devSetBasePower = (power) => (basePower = power);
   window.devSetBaseCrackingChance = (chance) => (baseCrackingChance = chance);
+  window.devSkipIntro = () => initializePhaseTerminal();
 }
-
 
 function frequencyChange(direction) {
   const curIndex = availableFrequencies.indexOf(frequencySelected);
@@ -219,8 +221,8 @@ function handleCapacitorThresholdLevels() {
 }
 
 function refreshGameDataLoop(loopCount) {
-  const _loopCount = loopCount || 0;
-  const nextLoopCount = gameState === 'discovery' ? _loopCount + 1 : _loopCount;
+  masterLoopCount = loopCount || 0;
+  const nextLoopCount = gameState === 'discovery' ? masterLoopCount + 1 : _loopCount;
 
   timeElapsed = gameState === 'discovery' ? loopRefreshRateMillis * _loopCount + accruedPenalty : 0;
   if (timeElapsed > maxTimeToLockdown * 0.7) AudioService.playSecondSound();
@@ -315,10 +317,7 @@ function resumeDiscovery() {
 function initializePhaseLose() {
   setGameState('prelose');
 
-  const doneCallback = (line) => {
-    setGameState('lose');
-    // line.callback = () => {};
-  };
+  const doneCallback = (line) => setGameState('lose');
   DrawingService.clearScreens();
   DrawingService.drawLose(doneCallback);
 }

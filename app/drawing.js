@@ -26,6 +26,7 @@ let siganturesLocked;
 let crackingSucceded;
 let drawingRefreshInterval;
 let drawingTickCounter;
+let redrawIntervalId;
 
 function resetGameStateValues() {
   smallDisplayLocked = false;
@@ -155,6 +156,10 @@ const configLinesBig = [
   { text: 'WARN: Falling back to the discoverable grid mode', time: 1000 },
   { text: 'Pick frequency for grid node discovery', time: 1000 },
   emptyLine, hashLine, emptyLine,
+  { text: 'MANUAL: Type one of the displayed Discoverable Signatures in time,', time: 500 },
+  { text: 'MANUAL: to match it with node signature displayed on the grid scheme', time: 500 },
+  { text: 'MANUAL: To attempt cracking the Master Key, press Enter when enough energy is stored', time: 500 },
+  emptyLine, hashLine, emptyLine,
   { text: 'NOTE: Higher frequency will allow faster grid discovery', time: 1000 },
   { text: 'NOTE: Lower frequency can be easier for successful manual discovery', time: 1000 },
   { text: '', time: 100 },
@@ -209,7 +214,7 @@ const crackBigLines = [
   { text: () => getKeyCrackingProgress(), time: crackingTime / 5 },
   emptyLine,
   { text: () => `${getSpaces(20)}${getKeyCrackingEffect()}`, time: 3000 },
-  { text: () => crackingSucceded ? `${getSpaces(20)}MISSION DATA STORE TRANSFER: |||||||||| 100%` : '', time: 3000 },
+  { text: () => crackingSucceded ? `${getSpaces(20)}MISSION DATA STORE TRANSFER: |||||||||| 100%` : '', time: () => crackingSucceded ? 6000 : 1000 },
   { text: () => crackingSucceded ? `${getSpaces(28)} >>> PRESS ENTER TO EXIT <<<` : '', time: 3000 },
 ];
 
@@ -234,13 +239,18 @@ const displayLineAndQueueNext = (canvas, lines, i, fx, fy, noBuzz, noDelay, done
   setDefaultFontStyles();
   if (i === 0 && !noDelay) canvas.isLocked = true;
   const noOp = () => {};
-  const _doneCallback = doneCallback || noOp;
-  const postCallback = (lineIdx) => lineIdx === lines.length - 1 ? _doneCallback() : noOp;
-  const delayTime = lines[i].time + (lines[i].afterTime || 0);
+  const curLine = lines[i];
+  const curText = curLine.text;
+  const curTime = curLine.time;
+
+  const lineText = typeof curText === 'function' ? curText() : curText;
+  const lineTime = typeof curTime === 'function' ? curTime() : curTime;
+
+  const postCallback = (lineIdx) => lineIdx === lines.length - 1 ? (doneCallback || noOp)() : noOp;
+
+  const delayTime = lineTime + (curLine.afterTime || 0);
   const ctx = canvas.ctx;
 
-  const curText = lines[i].text;
-  const lineText = typeof curText === 'function' ? curText() : curText;
 
   const redrawPrevious = (i) => {
     const redrawPrev = (i) => {
@@ -250,8 +260,8 @@ const displayLineAndQueueNext = (canvas, lines, i, fx, fy, noBuzz, noDelay, done
     redrawPrev(i);
   };
 
-  (lines[i].callback || (() => {}))(lines[i]);
-  if (!noDelay) fillTextGradually(ctx, lineText, lines[i].time, fx(i), fy(i, lines), 0, noBuzz, redrawPrevious, i, postCallback);
+  (curLine.callback || (() => {}))(curLine);
+  if (!noDelay) fillTextGradually(ctx, lineText, lineTime, fx(i), fy(i, lines), 0, noBuzz, redrawPrevious, i, postCallback);
   if (noDelay) fillTextImmediately(ctx, lineText, fx(i), fy(i, lines), i);
 
   if (lines[i + 1]) {
@@ -317,7 +327,6 @@ function clearSmallScreen() {
   smallCanvas.ctx.clearRect(0, 0, smallCanvas.WIDTH, smallCanvas.HEIGHT);
 }
 
-let redrawIntervalId;
 function startRefreshInterval(interval, gameState) {
   redrawIntervalId = setInterval(() => refreshScreens(gameState), interval);
 }
