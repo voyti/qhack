@@ -115,12 +115,10 @@ function init(startAtConfig) {
 
   initializePowerManager();
   if (!startAtConfig) initializePhaseTerminal();
-  // initializePhaseConfig();
   if (startAtConfig) {
     setGameState('preconfig');
     initializePhaseConfig();
   }
-  // initializePhaseDiscovery();
 
   const alphabeticalMatcher = (char) => char.match(/[A-Za-z0-9]/);
 
@@ -234,7 +232,6 @@ function handleCapacitorThresholdLevels() {
   }
 
   if (capacitorLevel === maxCapacitorLevel && !capacitorLevel3Reached) {
-    AudioService.playBlink3Sound();
     capacitorLevel3Reached = true;
   }
 }
