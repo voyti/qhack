@@ -36,8 +36,10 @@ let capacitorLevel2Reached;
 let capacitorLevel3Reached;
 let boardLocked;
 let masterLoopCount;
+let queuedLoopTimeout;
 
 function resetGameStateValues() {
+  window.clearTimeout(queuedLoopTimeout);
   qubitsOperational = 0;
   chargeAvailable = 0;
   solarArraysOnline = 0;
@@ -55,6 +57,7 @@ function resetGameStateValues() {
   capacitorLevel3Reached = false;
   boardLocked = false;
   masterLoopCount = 0;
+  queuedLoopTimeout = null;
 
   window.devSetBasePower = (power) => (basePower = power);
 }
@@ -110,10 +113,10 @@ function init(startAtConfig) {
   resetGameStateValues();
   DrawingService.setFrequencyData(frequencySelected, gameState);
 
-  DrawingService.initDrawing();
+  DrawingService.initDrawing(BoardService);
   DrawingService.clearScreens();
 
-  initializePowerManager();
+  refreshGameDataLoop();
   if (!startAtConfig) initializePhaseTerminal();
   if (startAtConfig) {
     setGameState('preconfig');
@@ -129,7 +132,10 @@ function init(startAtConfig) {
       38: 'up',
       40: 'down',
     };
+    // =
     if (e.keyCode === 187) window.devSetTextTimeWarp(10);
+    // -
+    if (e.keyCode === 189) AudioService.toggleMusic();
 
     if (inputMap[e.keyCode] === 'enter') {
       if (gameState === 'postwin') {
@@ -186,10 +192,6 @@ function getPower() {
   const directPower = basePower + (solarArraysOnline * powerPerSolarArray);
   const randomOscilationValue = Math.random() * 0.1 * directPower * (Math.random() > 0.5 ? -1 : 1);
   return directPower + randomOscilationValue;
-}
-
-function initializePowerManager() {
-  refreshGameDataLoop();
 }
 
 function resetCharge() {
@@ -250,7 +252,7 @@ function refreshGameDataLoop(loopCount) {
   gameData.timeToLockDown = maxTimeToLockdown - timeElapsed;
   DrawingService.applyGameData(gameData, gameState);
 
-  setTimeout(() => {
+  queuedLoopTimeout = setTimeout(() => {
     ((nextCount) => refreshGameDataLoop(nextCount))(nextLoopCount);
   }, loopRefreshRateMillis);
 }
@@ -308,6 +310,7 @@ function initializePhaseDiscovery() {
 
   const doneCallback = (line) => {
     setGameState('discovery');
+    AudioService.startMusic();
   };
   discoverableSignatures = generateUniqueDiscoverablesignatures();
   const gameData = getGameDataForDrawing();
